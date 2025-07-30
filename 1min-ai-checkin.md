@@ -33,5 +33,8 @@ docker compose down && docker compose up -d
 
 3. Import workflow
 
+- Create Workflow > Import from URL > `https://raw.githubusercontent.com/Oschangkai/n8n/refs/heads/main/1min-ai-checkin.json`
+- Click on nodes with exclamation marks and fill in credentials
+
 ## Reference
 [7a6163/1min-checkin - GitHub](https://github.com/7a6163/1min-checkin)

@@ -33,5 +33,8 @@ docker compose down && docker compose up -d
 
 3. 匯入 workflow
 
+- Create Workflow > Import from URL > `https://raw.githubusercontent.com/Oschangkai/n8n/refs/heads/main/1min-ai-checkin.json`
+- 點開有驚嘆號的 node，填入 credentials
+
 ## 參考來源
 [7a6163/1min-checkin - GitHub](https://github.com/7a6163/1min-checkin)
