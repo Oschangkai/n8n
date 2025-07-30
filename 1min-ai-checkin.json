@@ -1,0 +1,921 @@
+{
+  "name": "1min.ai checkin",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "5 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "0b07a19f-6d02-47a0-a65c-3cfde4ccd1e0",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate random device ID\nconst chars = '0123456789abcdef';\nconst randomString = (length) => \n  Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');\n\nconst part1 = randomString(16);\nconst part2 = randomString(15);\nconst deviceId = `$device:${part1}-${part2}-17525636-16a7f0-${part1}`;\n\nreturn {\n  deviceId: deviceId,\n  email: $env.EMAIL,\n  password: $env.PASSWORD,\n  totpSecret: $env.TOTP_SECRET\n};"
+      },
+      "id": "253a9bcb-4dda-4857-9501-ca8d32b5ba1e",
+      "name": "Generate Device ID",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.1min.ai/auth/login",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Host",
+              "value": "api.1min.ai"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Auth-Token",
+              "value": "Bearer"
+            },
+            {
+              "name": "Mp-Identity",
+              "value": "={{$json.deviceId}}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Origin",
+              "value": "https://app.1min.ai"
+            },
+            {
+              "name": "Referer",
+              "value": "https://app.1min.ai/"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $env['ONEMINAI_EMAIL'] }}"
+            },
+            {
+              "name": "password",
+              "value": "={{$env['ONEMINAI_PASS']}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "cd9048c2-22fa-43aa-8fc8-d96442ca1df2",
+      "name": "Login Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        144
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "mfa-check",
+              "leftValue": "={{$json.user?.mfaRequired}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            },
+            {
+              "id": "edf57e6c-47a7-4ae3-b4b5-8862ac893b2a",
+              "leftValue": "={{ $json.user.mfaRequired }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "ignoreCase": true,
+          "looseTypeValidation": false
+        }
+      },
+      "id": "97972bf8-e161-410c-9fd7-666c3ca70105",
+      "name": "Check MFA Required",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        464,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.1min.ai/auth/mfa/verify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Host",
+              "value": "api.1min.ai"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Auth-Token",
+              "value": "Bearer"
+            },
+            {
+              "name": "Mp-Identity",
+              "value": "={{ $('Generate Device ID').item.json.deviceId }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Origin",
+              "value": "https://app.1min.ai"
+            },
+            {
+              "name": "Referer",
+              "value": "https://app.1min.ai/"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "code",
+              "value": "={{ $json.token }}"
+            },
+            {
+              "name": "token",
+              "value": "={{ $('Login Request').item.json.user.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c2b6065b-faa9-4c5d-b35c-a1b557754edc",
+      "name": "MFA Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -80
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.1min.ai/teams/{{ $('Extract Info').item.json.teamId }}/credits",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Host",
+              "value": "api.1min.ai"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Auth-Token",
+              "value": "=Bearer {{ $('Extract Info').item.json.authToken }}"
+            },
+            {
+              "name": "Mp-Identity",
+              "value": "={{ $('Generate Device ID').item.json.deviceId }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Origin",
+              "value": "https://app.1min.ai"
+            },
+            {
+              "name": "Referer",
+              "value": "https://app.1min.ai/"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "0ac61960-90e3-41ea-b0af-2a600dc375e5",
+      "name": "Get Initial Credits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        976,
+        240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.1min.ai/notifications/unread",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Host",
+              "value": "api.1min.ai"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Auth-Token",
+              "value": "=Bearer {{$('Extract Info').first().json.authToken}}"
+            },
+            {
+              "name": "Mp-Identity",
+              "value": "={{ $('Generate Device ID').item.json.deviceId }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Origin",
+              "value": "https://app.1min.ai"
+            },
+            {
+              "name": "Referer",
+              "value": "https://app.1min.ai/"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "73b63fa3-0341-4416-b689-598cd55ca903",
+      "name": "Check Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "unit": "seconds"
+      },
+      "id": "83d53bc4-303a-443a-9185-ce77572d93f0",
+      "name": "Wait 1 Second",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        240
+      ],
+      "webhookId": "4dc94475-0659-4499-86a1-1149fc5aa0b7"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.1min.ai/teams/{{$('Extract Info').first().json.teamId}}/credits",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Host",
+              "value": "api.1min.ai"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Auth-Token",
+              "value": "=Bearer {{$('Extract Info').first().json.authToken}}"
+            },
+            {
+              "name": "Mp-Identity",
+              "value": "={{ $('Generate Device ID').item.json.deviceId }}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Origin",
+              "value": "https://app.1min.ai"
+            },
+            {
+              "name": "Referer",
+              "value": "https://app.1min.ai/"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "9c3b1d26-37fb-4154-96b0-f8634d8180a1",
+      "name": "Get Final Credits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1456,
+        240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "text": "={{ \"🎉 Checkin process completed.\\n\" + $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        240
+      ],
+      "id": "6562c23b-3d26-4a20-bdf9-c39108952cbb",
+      "name": "Send a text message",
+      "webhookId": "9dca3645-cc18-420c-80d2-fe2386d2da12",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.totp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -80
+      ],
+      "id": "470588d7-27d2-4800-b2ca-7743e9db0cb9",
+      "name": "Generate MFA Code",
+      "credentials": {
+        "totpApi": {
+          "id": "",
+          "name": "1min.ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "text": "🎬 1min.ai auto checkin started",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        144
+      ],
+      "id": "1fcba673-74e6-46f4-99de-a32c55af0f02",
+      "name": "Notify Started Checkin",
+      "webhookId": "9dca3645-cc18-420c-80d2-fe2386d2da12",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Started Checkin').item.json.result.text + '\\n' + \"🚀 Starting login request...\" }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        144
+      ],
+      "id": "00ef5e00-6273-4475-97da-e54d16d16fd1",
+      "name": "Notify Started Login",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Started Login').item.json.result.text + \"\\n❌ Login failed\"}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        320
+      ],
+      "id": "944d9ab8-243b-43ec-b5c2-b16d4431c55c",
+      "name": "Notify Login Failed",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Started Checkin').item.json.result.text + \"\\n🚀 Starting login request...\" + \"\\n✅ Login successful\"}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        240
+      ],
+      "id": "5dbff755-73c9-4fdf-bdf3-481d50f2feea",
+      "name": "Notify Login Success",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Started Login').item.json.result.text + \"\\n🔐 TOTP verification required\"}}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        -80
+      ],
+      "id": "e1b62f75-25fa-400a-be31-17e0339e807b",
+      "name": "Notify Pending MFA",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract team info and auth token\nconst user = $json.user;\nconst teamInfo = user?.teams?.[0];\nconst teamId = teamInfo?.teamId || teamInfo?.team?.uuid;\nconst authToken = $json.token || $json.user?.token;\nconst userName = teamInfo?.userName || (user?.email ? user.email.split('@')[0] : 'User');\nconst usedCredit = teamInfo?.usedCredit || 0;\n\nreturn {\n  ...items[0].json,\n  teamId: teamId,\n  authToken: authToken,\n  userName: userName,\n  usedCredit: usedCredit\n};"
+      },
+      "id": "34c995e3-136e-4822-97e0-fe00910cb1d2",
+      "name": "Extract Info",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        656,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Calculate rewards and format results\nconst teamInfo = $('Extract Info').first().json;\nconst initialCredit = $('Get Initial Credits').first().json.credit || 0;\nconst finalCredit = $json.credit || 0;\nconst creditDiff = finalCredit - initialCredit;\nconst userName = teamInfo.userName;\nconst usedCredit = teamInfo.usedCredit;\nconst totalCredit = finalCredit + usedCredit;\nconst availablePercent = totalCredit > 0 ? ((finalCredit / totalCredit) * 100).toFixed(1) : 0;\n\nlet status = 'success';\nlet message = `${userName} | Balance: ${finalCredit.toLocaleString()}`;\n\nif (creditDiff > 0) {\n  message += ` (+${creditDiff.toLocaleString()}) Check-in reward received!`;\n} else if (creditDiff === 0) {\n  message += ' Already checked in today or no reward';\n} else {\n  message += ` (${creditDiff.toLocaleString()}) Credits decreased`;\nstatus = 'warning';\n}\nmessage += ` (${availablePercent}%)`;\n\nreturn {\n  status: status,\n  message: message,\n  initialCredit: initialCredit,\n  finalCredit: finalCredit,\n  creditDiff: creditDiff,\n  availablePercent: availablePercent,\n  userName: userName,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        240
+      ],
+      "id": "ab0a93c2-3239-40db-ad1a-8af4eb40cc28",
+      "name": "Construct Message"
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Pending MFA').item.json.result.text + \"\\n❌ MFA verification failed\" }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        48
+      ],
+      "id": "044b80df-3a07-4757-8594-34bd247c3ae6",
+      "name": "Notify MFA Failed",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Login Success').item.json.result.text + \"\\n❌ Failed to get initial credits\" }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        416
+      ],
+      "id": "91f7820b-1f88-46c2-910e-496cc1810daa",
+      "name": "Notify Credits Failed",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Login Success').item.json.result.text + \"\\n❌ Failed to check notifications\" }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        416
+      ],
+      "id": "e6cfc788-e3e5-497b-8508-13c0dc68f132",
+      "name": "Notify Notifications Failed",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $env['ONEMINAI_NOTIFY_TELEGRAM_CHATID'] }}",
+        "messageId": "={{ $('Notify Started Checkin').item.json.result.message_id }}",
+        "text": "={{ $('Notify Login Success').item.json.result.text + \"\\n❌ Failed to get final credits\" }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1664,
+        416
+      ],
+      "id": "c4e88902-2d4b-4603-8ff4-41d525586943",
+      "name": "Notify Final Credits Failed",
+      "webhookId": "08a34663-42f0-4431-95ac-20b785510c29",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notify Started Checkin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Device ID": {
+      "main": [
+        [
+          {
+            "node": "Notify Started Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login Request": {
+      "main": [
+        [
+          {
+            "node": "Check MFA Required",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Login Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check MFA Required": {
+      "main": [
+        [
+          {
+            "node": "Notify Pending MFA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MFA Verification": {
+      "main": [
+        [
+          {
+            "node": "Extract Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify MFA Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Initial Credits": {
+      "main": [
+        [
+          {
+            "node": "Check Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Credits Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Notifications": {
+      "main": [
+        [
+          {
+            "node": "Wait 1 Second",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Notifications Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1 Second": {
+      "main": [
+        [
+          {
+            "node": "Get Final Credits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Final Credits": {
+      "main": [
+        [
+          {
+            "node": "Construct Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Final Credits Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate MFA Code": {
+      "main": [
+        [
+          {
+            "node": "MFA Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Started Checkin": {
+      "main": [
+        [
+          {
+            "node": "Generate Device ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Started Login": {
+      "main": [
+        [
+          {
+            "node": "Login Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Login Success": {
+      "main": [
+        [
+          {
+            "node": "Get Initial Credits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Pending MFA": {
+      "main": [
+        [
+          {
+            "node": "Generate MFA Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Info": {
+      "main": [
+        [
+          {
+            "node": "Notify Login Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct Message": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3dcafe04-a81d-46aa-844c-01e8032b59ca",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "61494b34d5450e43f2e504aab21a9a98d0065cd313387e8f5d0b43f26898af36"
+  },
+  "id": "BIZRapf1BAGR2UzY",
+  "tags": [
+    {
+      "name": "checkin",
+      "id": "Iq2qQyjbyOq0FrWb",
+      "createdAt": "2025-07-30T08:30:39.087Z",
+      "updatedAt": "2025-07-30T08:30:39.087Z"
+    }
+  ]
+}
